@@ -1,4 +1,33 @@
 <script setup lang="ts">
+import { reactive as _reactive, ref as _ref } from "vue";
+const tpInput = _ref<HTMLInputElement | null>(null);
+const tagPreset = _reactive((() => {
+  try { return JSON.parse(localStorage.getItem("bbi_tag_preset_v1") || "") || { enabled: false, name: "", msgs: [] }; }
+  catch { return { enabled: false, name: "", msgs: [] }; }
+})());
+function saveTp() { localStorage.setItem("bbi_tag_preset_v1", JSON.stringify(tagPreset)); }
+function clearTp() { tagPreset.enabled = false; tagPreset.name = ""; tagPreset.msgs = []; saveTp(); }
+async function onTpFile(e: Event) {
+  const f = (e.target as HTMLInputElement).files?.[0]; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    const map = new Map((d.prompts || []).map((x: any) => [String(x.identifier), x]));
+    const ord = d.prompt_order?.find((o: any) => o.character_id === 100001)?.order || d.prompt_order?.[0]?.order || (d.prompts || []).map((x: any) => ({ identifier: x.identifier, enabled: x.enabled }));
+    const vars = new Map<string, string>();
+    const msgs: any[] = []; let post = false;
+    for (const o of ord) {
+      if (!o?.enabled) continue;
+      const it: any = map.get(String(o.identifier)); if (!it) continue;
+      if (it.marker) { if (it.identifier === "chatHistory") post = true; continue; }
+      let s = String(it.content || "").replace(/\{\{\/\/[\s\S]*?\}\}/g, "").replace(/\{\{setvar::([^:}]+)::([\s\S]*?)\}\}/g, (_: any, k: string, val: string) => { vars.set(k.trim(), val); return ""; });
+      for (let i = 0; i < 2; i++) s = s.replace(/\{\{getvar::([^}]+)\}\}/g, (_: any, k: string) => vars.get(k.trim()) ?? "");
+      s = s.replace(/\s*\{\{trim\}\}\s*/gi, "").trim();
+      if (s) msgs.push({ role: it.role === "user" || it.role === "assistant" ? it.role : "system", content: s, post: post || it.injection_position === 1 });
+    }
+    tagPreset.name = f.name.replace(/\.json$/i, ""); tagPreset.msgs = msgs; tagPreset.enabled = true; saveTp();
+  } catch (err) { alert("预设解析失败: " + err); }
+  (e.target as HTMLInputElement).value = "";
+}
 import BbiSelect from '@/components/BbiSelect.vue';
 import BbiTextarea from '@/components/BbiTextarea.vue';
 import Collapsible from '@/components/Collapsible.vue';
@@ -852,6 +881,18 @@ async function confirmUpdate() {
       </Collapsible>
 
       <!-- 自定义提示词(与柏宝书同款入口,独立成区) -->
+      <Collapsible title="柏宝绘tag预设" :open="true">
+        <label class="bbi-switch-row">
+          <span class="bbi-field-label">启用柏宝绘tag预设</span>
+          <input v-model="tagPreset.enabled" type="checkbox" class="bbi-checkbox" @change="saveTp" />
+        </label>
+        <p class="bbi-field-hint">当前预设：{{ tagPreset.name || "未导入 (.json)" }}（共 {{ tagPreset.msgs.length }} 条启用项）</p>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <input ref="tpInput" type="file" accept=".json,application/json" style="display:none" @change="onTpFile" />
+          <button class="bbi-btn bbi-btn-sm bbi-btn-primary" type="button" @click="tpInput?.click()">导入 JSON 预设</button>
+          <button v-if="tagPreset.name" class="bbi-btn bbi-btn-sm bbi-btn-danger" type="button" @click="clearTp">清除预设</button>
+        </div>
+      </Collapsible>
       <Collapsible title="自定义提示词" :open="false">
         <ul class="bbi-prompt-list">
           <li v-for="m in TAG_PROMPT_METAS" :key="m.key" class="bbi-prompt-item">
