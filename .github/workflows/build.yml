@@ -22,7 +22,7 @@ jobs:
           }
           let p = fs.readFileSync("src/autoTag/prompt.ts", "utf8");
           if (!p.includes("bbi_tag_preset_v1")) {
-            const hook = `    try {
+            const hook = String.raw`    try {
                   const raw = JSON.parse(localStorage.getItem("bbi_tag_preset_v1") || "null");
                   if (raw && raw.enabled && Array.isArray(raw.msgs) && raw.msgs.length) {
                       const pre: ChatMsg[] = [], post: ChatMsg[] = [];
@@ -45,7 +45,7 @@ jobs:
           }
           let v = fs.readFileSync("src/pages/settings/index.vue", "utf8");
           if (!v.includes("柏宝绘tag预设")) {
-            const ui = `<Collapsible title="柏宝绘tag预设" :open="true">
+            const ui = String.raw`<Collapsible title="柏宝绘tag预设" :open="true">
                   <label class="bbi-switch-row">
                     <span class="bbi-field-label">启用柏宝绘tag预设</span>
                     <input v-model="tagPreset.enabled" type="checkbox" class="bbi-checkbox" @change="saveTp" />
@@ -59,7 +59,7 @@ jobs:
                 </Collapsible>
                 <Collapsible title="自定义提示词"`;
             v = v.replace(`<Collapsible title="自定义提示词"`, ui);
-            const sc = `<script setup lang="ts">
+            const sc = String.raw`<script setup lang="ts">
           import { reactive as _reactive, ref as _ref } from "vue";
           const tpInput = _ref<HTMLInputElement | null>(null);
           const tagPreset = _reactive((() => {
